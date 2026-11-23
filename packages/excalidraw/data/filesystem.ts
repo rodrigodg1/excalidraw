@@ -193,9 +193,10 @@ export const fileOpen = async <M extends boolean | undefined = false>(opts: {
       res.files.map(async (item) => {
         const bytes = base64ToUint8Array(item.contentBase64);
         const file = new File([bytes.buffer as ArrayBuffer], item.name);
-        (file as File & { handle?: FileSystemFileHandle }).handle =
+        const normalized = await normalizeFile(file);
+        (normalized as File & { handle?: FileSystemFileHandle }).handle =
           createDesktopFileHandle(item.name, item.path);
-        return normalizeFile(file);
+        return normalized;
       }),
     );
     return (opts.multiple ? openedFiles : openedFiles[0]) as RetType;

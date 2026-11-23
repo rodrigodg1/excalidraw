@@ -525,6 +525,8 @@ export const normalizeFile = async (file: File) => {
     return file;
   }
 
+  const originalHandle = file.handle;
+
   if (file?.name?.endsWith(".excalidrawlib")) {
     file = createFile(file, MIME_TYPES.excalidrawlib, file.name);
   } else if (file?.name?.endsWith(".excalidraw")) {
@@ -539,6 +541,9 @@ export const normalizeFile = async (file: File) => {
     }
   }
 
+  if (originalHandle && !file.handle) {
+    file.handle = originalHandle;
+  }
   (file as any)[normalizedFileSymbol] = true;
 
   return file;
