@@ -266,4 +266,29 @@ export const fileSave = async (
   );
 };
 
+export const loadLastDesktopFile = async (): Promise<File | null> => {
+  if (!getDesktopBridge()) {
+    return null;
+  }
+  try {
+    const res = await invokeDesktopBridge<{
+      found?: boolean;
+      name?: string;
+      path?: string;
+      contentBase64?: string;
+    }>("getLastFile", {});
+    if (!res?.found || !res.name || !res.path || !res.contentBase64) {
+      return null;
+    }
+    const bytes = base64ToUint8Array(res.contentBase64);
+    const file = new File([bytes.buffer as ArrayBuffer], res.name);
+    const normalized = await normalizeFile(file);
+    (normalized as File & { handle?: FileSystemFileHandle }).handle =
+      createDesktopFileHandle(res.name, res.path);
+    return normalized;
+  } catch {
+    return null;
+  }
+};
+
 export { nativeFileSystemSupported };

@@ -497,6 +497,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     // MARK: - WKScriptMessageHandler (Native File Save/Open Bridge)
 
+    private static let lastFileDefaultsKey = "lastOpenedExcalidrawFilePath"
+
+    private func rememberLastFileIfProject(_ url: URL) {
+        if url.pathExtension.lowercased() == "excalidraw" {
+            UserDefaults.standard.set(url.path, forKey: Self.lastFileDefaultsKey)
+        }
+    }
+
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.name == "excalidrawDesktop",
               let body = message.body as? [String: Any],
@@ -510,8 +518,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             handleBridgeSaveFile(requestId: requestId, body: body)
         case "openFile":
             handleBridgeOpenFile(requestId: requestId, body: body)
+        case "getLastFile":
+            handleBridgeGetLastFile(requestId: requestId)
         default:
             resolveDesktopBridge(requestId: requestId, result: nil, error: "Unknown action: \(action)")
+        }
+    }
+
+    private func handleBridgeGetLastFile(requestId: String) {
+        guard let path = UserDefaults.standard.string(forKey: Self.lastFileDefaultsKey),
+              !path.isEmpty,
+              FileManager.default.fileExists(atPath: path) else {
+            resolveDesktopBridge(requestId: requestId, result: ["found": false], error: nil)
+            return
+        }
+
+        let url = URL(fileURLWithPath: path)
+        do {
+            let data = try Data(contentsOf: url)
+            window.title = "Excalidraw — \(url.lastPathComponent)"
+            resolveDesktopBridge(
+                requestId: requestId,
+                result: [
+                    "found": true,
+                    "name": url.lastPathComponent,
+                    "path": url.path,
+                    "contentBase64": data.base64EncodedString()
+                ],
+                error: nil
+            )
+        } catch {
+            resolveDesktopBridge(requestId: requestId, result: ["found": false], error: nil)
         }
     }
 
@@ -528,6 +565,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             let targetURL = URL(fileURLWithPath: existingPath)
             do {
                 try data.write(to: targetURL, options: .atomic)
+                rememberLastFileIfProject(targetURL)
                 window.title = "Excalidraw — \(targetURL.lastPathComponent)"
                 resolveDesktopBridge(
                     requestId: requestId,
@@ -551,6 +589,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             }
             do {
                 try data.write(to: url, options: .atomic)
+                rememberLastFileIfProject(url)
                 self.window.title = "Excalidraw — \(url.lastPathComponent)"
                 self.resolveDesktopBridge(
                     requestId: requestId,
@@ -591,6 +630,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             }
 
             if let first = panel.urls.first {
+                self.rememberLastFileIfProject(first)
                 self.window.title = "Excalidraw — \(first.lastPathComponent)"
             }
             self.resolveDesktopBridge(requestId: requestId, result: ["files": filesPayload], error: nil)

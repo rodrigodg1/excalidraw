@@ -38,6 +38,7 @@ import {
   isImageFileHandle,
   loadFromBlob,
 } from "@excalidraw/excalidraw/data/blob";
+import { loadLastDesktopFile } from "@excalidraw/excalidraw/data/filesystem";
 import { serializeAsJSON } from "@excalidraw/excalidraw/data/json";
 import { t } from "@excalidraw/excalidraw/i18n";
 
@@ -368,6 +369,28 @@ const initializeScene = async (opts: {
       key: roomLinkData.roomKey,
     };
   } else if (scene) {
+    if (!isExternalScene && !externalUrlMatch) {
+      try {
+        const lastDesktopFile = await loadLastDesktopFile();
+        if (lastDesktopFile) {
+          const loaded = await loadFromBlob(
+            lastDesktopFile,
+            opts.excalidrawAPI.getAppState(),
+            null,
+            lastDesktopFile.handle,
+          );
+          return {
+            scene: {
+              ...loaded,
+              scrollToContent: true,
+            },
+            isExternalScene: false,
+          };
+        }
+      } catch (error) {
+        console.warn("Failed to restore last desktop file:", error);
+      }
+    }
     return isExternalScene && jsonBackendMatch
       ? {
           scene,

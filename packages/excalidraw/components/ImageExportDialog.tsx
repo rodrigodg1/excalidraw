@@ -20,7 +20,7 @@ import {
 import { probablySupportsClipboardBlob } from "../clipboard";
 import { prepareElementsForExport } from "../data";
 import { canvasToBlob } from "../data/blob";
-import { nativeFileSystemSupported } from "../data/filesystem";
+import { fileSave, nativeFileSystemSupported } from "../data/filesystem";
 import { useCopyStatus } from "../hooks/useCopiedIndicator";
 
 import { t } from "../i18n";
@@ -110,6 +110,66 @@ const ImageExportModal = ({
     appStateSnapshot,
     exportSelectionOnly,
   );
+
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+
+  const handleExportToPdf = async () => {
+    if (isExportingPdf || exportedElements.length === 0) {
+      return;
+    }
+    setIsExportingPdf(true);
+    try {
+      const pdfScale = Math.max(exportScale, 2);
+      const canvas = await exportScene({
+        type: "canvas",
+        data: {
+          elements: exportedElements,
+          appState: appStateSnapshot,
+          files,
+        },
+        config: {
+          ...getExportConfigFromAppState({
+            ...appStateSnapshot,
+            exportBackground: exportWithBackground,
+            exportWithDarkMode,
+            exportScale: pdfScale,
+          }),
+          padding: DEFAULT_EXPORT_PADDING,
+          exportingFrame,
+        },
+      });
+
+      const { jsPDF } = await import("jspdf");
+      const widthPt = canvas.width / pdfScale;
+      const heightPt = canvas.height / pdfScale;
+      const pdf = new jsPDF({
+        orientation: widthPt > heightPt ? "landscape" : "portrait",
+        unit: "pt",
+        format: [widthPt, heightPt],
+      });
+      pdf.addImage(
+        canvas.toDataURL("image/png"),
+        "PNG",
+        0,
+        0,
+        widthPt,
+        heightPt,
+      );
+      const pdfBlob = pdf.output("blob");
+      await fileSave(pdfBlob, {
+        name: projectName,
+        extension: "pdf",
+        mimeTypes: ["application/pdf"],
+        description: "PDF document",
+      });
+    } catch (error: any) {
+      if (error?.name !== "AbortError") {
+        console.error("Failed to export PDF:", error);
+      }
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   useEffect(() => {
     const previewNode = previewRef.current;
@@ -329,6 +389,14 @@ const ImageExportModal = ({
             icon={downloadIcon}
           >
             {t("imageExportDialog.button.exportToSvg")}
+          </FilledButton>
+          <FilledButton
+            className="ImageExportModal__settings__buttons__button"
+            label="Export to PDF"
+            onClick={handleExportToPdf}
+            icon={downloadIcon}
+          >
+            {isExportingPdf ? "PDF..." : "PDF"}
           </FilledButton>
           {(probablySupportsClipboardBlob || isFirefox) && (
             <FilledButton
