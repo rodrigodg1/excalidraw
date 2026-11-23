@@ -34,7 +34,11 @@ import {
 } from "@excalidraw/common";
 import polyfill from "@excalidraw/excalidraw/polyfill";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { loadFromBlob } from "@excalidraw/excalidraw/data/blob";
+import {
+  isImageFileHandle,
+  loadFromBlob,
+} from "@excalidraw/excalidraw/data/blob";
+import { serializeAsJSON } from "@excalidraw/excalidraw/data/json";
 import { t } from "@excalidraw/excalidraw/i18n";
 
 import {
@@ -47,14 +51,17 @@ import {
   share,
   youtubeIcon,
 } from "@excalidraw/excalidraw/components/icons";
-import { isElementLink } from "@excalidraw/element";
+import {
+  getSceneVersion,
+  isElementLink,
+  isInitializedImageElement,
+  newElementWith,
+} from "@excalidraw/element";
 import {
   bumpElementVersions,
   restoreAppState,
   restoreElements,
 } from "@excalidraw/excalidraw/data/restore";
-import { newElementWith } from "@excalidraw/element";
-import { isInitializedImageElement } from "@excalidraw/element";
 import clsx from "clsx";
 import {
   parseLibraryTokensFromUrl,
@@ -695,8 +702,44 @@ const ExcalidrawWrapper = () => {
     };
   }, [isCollabDisabled, collabAPI, excalidrawAPI, setLangCode, loadImages]);
 
+  const lastAutoSaveRef = useRef<{
+    fileHandle: FileSystemFileHandle | null;
+    signature: string;
+  }>({ fileHandle: null, signature: "" });
+
+  const autoSaveToFile = useMemo(
+    () =>
+      debounce(
+        async (
+          elements: readonly OrderedExcalidrawElement[],
+          appState: AppState,
+          files: BinaryFiles,
+          fileHandle: FileSystemFileHandle,
+          signature: string,
+        ) => {
+          try {
+            const serialized = serializeAsJSON(
+              elements,
+              appState,
+              files,
+              "local",
+            );
+            const writable = await fileHandle.createWritable();
+            await writable.write(serialized);
+            await writable.close();
+            lastAutoSaveRef.current = { fileHandle, signature };
+          } catch (error) {
+            console.error("Auto-save failed:", error);
+          }
+        },
+        800,
+      ),
+    [],
+  );
+
   useEffect(() => {
     const unloadHandler = (event: BeforeUnloadEvent) => {
+      autoSaveToFile.flush();
       LocalData.flushSave();
 
       if (
@@ -716,9 +759,10 @@ const ExcalidrawWrapper = () => {
     };
     window.addEventListener(EVENT.BEFORE_UNLOAD, unloadHandler);
     return () => {
+      autoSaveToFile.cancel();
       window.removeEventListener(EVENT.BEFORE_UNLOAD, unloadHandler);
     };
-  }, [excalidrawAPI]);
+  }, [excalidrawAPI, autoSaveToFile]);
 
   const onChange = (
     elements: readonly OrderedExcalidrawElement[],
@@ -727,6 +771,25 @@ const ExcalidrawWrapper = () => {
   ) => {
     if (collabAPI?.isCollaborating()) {
       collabAPI.syncElements(elements);
+    }
+
+    const fileHandle = appState.fileHandle;
+    if (
+      fileHandle &&
+      !isImageFileHandle(fileHandle) &&
+      !appState.viewModeEnabled &&
+      !collabAPI?.isCollaborating()
+    ) {
+      const signature = `${getSceneVersion(elements)}:${Object.keys(files).length}:${appState.name ?? ""}:${appState.viewBackgroundColor}:${appState.gridSize}:${appState.gridStep}`;
+      if (lastAutoSaveRef.current.fileHandle !== fileHandle) {
+        // File handle was just attached (e.g. via Save or Open); record baseline without redundant write
+        lastAutoSaveRef.current = { fileHandle, signature };
+      } else if (lastAutoSaveRef.current.signature !== signature) {
+        autoSaveToFile(elements, appState, files, fileHandle, signature);
+      }
+    } else if (lastAutoSaveRef.current.fileHandle !== null) {
+      lastAutoSaveRef.current = { fileHandle: null, signature: "" };
+      autoSaveToFile.cancel();
     }
 
     // this check is redundant, but since this is a hot path, it's best

@@ -593,6 +593,19 @@ function CommandPaletteInner({
             }));
           },
         },
+        {
+          label: "LaTeX Math...",
+          category: DEFAULT_CATEGORIES.tools,
+          viewMode: false,
+          perform: () => {
+            setAppState((state) => ({
+              ...state,
+              openDialog: {
+                name: "latex",
+              },
+            }));
+          },
+        },
         // {
         //   label: `${t("toolBar.magicframe")}...`,
         //   category: DEFAULT_CATEGORIES.tools,

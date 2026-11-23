@@ -495,7 +495,8 @@ export interface AppState {
     | { name: "commandPalette" }
     | { name: "settings" }
     | { name: "elementLinkSelector"; sourceElementId: ExcalidrawElement["id"] }
-    | { name: "charts"; data: Spreadsheet; rawText: string };
+    | { name: "charts"; data: Spreadsheet; rawText: string }
+    | { name: "latex" };
   /**
    * Reflects user preference for whether the default sidebar should be docked.
    *
@@ -1259,6 +1260,7 @@ export type AppClassProperties = {
   clipboard: App["clipboard"];
   id: App["id"];
   onInsertElements: App["onInsertElements"];
+  insertImages: App["insertImages"];
   onExportImage: App["onExportImage"];
   viewport: App["viewport"];
   wheel: App["wheel"];

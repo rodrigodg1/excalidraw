@@ -22,6 +22,7 @@ import {
   laserPointerToolIcon,
   bucketFillIcon,
   MagicIcon,
+  mathIcon,
   mermaidLogoIcon,
   DotsIcon,
 } from "./icons";
@@ -202,6 +203,13 @@ const ExtraToolsDropdown = ({
           data-testid="toolbar-embeddable"
         >
           {t("toolBar.mermaidToExcalidraw")}
+        </DropdownMenu.Item>
+        <DropdownMenu.Item
+          onSelect={() => app.setOpenDialog({ name: "latex" })}
+          icon={mathIcon}
+          data-testid="toolbar-latex"
+        >
+          LaTeX Math
         </DropdownMenu.Item>
         {app.props.aiEnabled !== false && app.plugins.diagramToCode && (
           <DropdownMenu.Item
