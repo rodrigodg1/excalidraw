@@ -502,6 +502,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     private func rememberLastFileIfProject(_ url: URL) {
         if url.pathExtension.lowercased() == "excalidraw" {
             UserDefaults.standard.set(url.path, forKey: Self.lastFileDefaultsKey)
+            window.representedURL = url
+            window.title = "Excalidraw — \(url.path)"
         }
     }
 
@@ -536,7 +538,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         let url = URL(fileURLWithPath: path)
         do {
             let data = try Data(contentsOf: url)
-            window.title = "Excalidraw — \(url.lastPathComponent)"
+            rememberLastFileIfProject(url)
             resolveDesktopBridge(
                 requestId: requestId,
                 result: [
@@ -566,7 +568,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             do {
                 try data.write(to: targetURL, options: .atomic)
                 rememberLastFileIfProject(targetURL)
-                window.title = "Excalidraw — \(targetURL.lastPathComponent)"
                 resolveDesktopBridge(
                     requestId: requestId,
                     result: ["path": targetURL.path, "name": targetURL.lastPathComponent],
@@ -590,7 +591,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             do {
                 try data.write(to: url, options: .atomic)
                 rememberLastFileIfProject(url)
-                self.window.title = "Excalidraw — \(url.lastPathComponent)"
                 self.resolveDesktopBridge(
                     requestId: requestId,
                     result: ["path": url.path, "name": url.lastPathComponent],
@@ -631,7 +631,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
             if let first = panel.urls.first {
                 self.rememberLastFileIfProject(first)
-                self.window.title = "Excalidraw — \(first.lastPathComponent)"
             }
             self.resolveDesktopBridge(requestId: requestId, result: ["files": filesPayload], error: nil)
         }
